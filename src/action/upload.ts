@@ -58,13 +58,7 @@ export async function uploadLogs(api: Octokit): Promise<void> {
             run_id: parseInt(runID)
         });
 
-        const location = jobLogsResponse.headers.location;
-
-        if (!location) {
-            throw new Error("Location header is not defined");
-        }
-
-        const log = await (await fetch(location)).text();
+        const log = jobLogsResponse.data as string;
         const name = job.name;
 
         logs.push({ log, name });
