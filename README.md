@@ -27,7 +27,7 @@ jobs:
       contents: write
     needs: release # Job with an output of release_id
     steps:
-    - uses: Kas-tle/release-build-log-action@1.0.0
+    - uses: Kas-tle/release-build-log-action@ # use latest commit hash
       with:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         releaseID: ${{ needs.build.outputs.release_id }}
@@ -40,6 +40,6 @@ jobs:
 | `GITHUB_TOKEN`  | The GitHub token to use for the release.                                     |         | `true`   |
 | `releaseID`     | The ID of the release to upload the logs.                                    |         | `true`   |
 | `attemptNumber` | The Run attempt to get the logs from. Defaults to the current attempt.       | `auto`  | `false`  |
-| `excludedJobs`  | Comma-separated or newline-separated list of jobs from which to ignore logs. | ``      | `false`  |
+| `excludedJobs`  | Comma-separated or newline-separated list of jobs from which to ignore logs. | ` `     | `false`  |
 | `formatAsHTML`  | Whether or not we should make an HTML file for the logs. Defaults to true.   | `true`  | `false`  |
 | `runID`         | The Run ID to get the logs from. Defaults to the current run.                | `auto`  | `false`  |
