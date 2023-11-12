@@ -30857,6 +30857,7 @@ async function uploadLogs(api) {
         const name = job.name;
         logs.push({ log, name });
     }
+    console.log(`Found ${logs.length} jobs to log`);
     const formatAsHTML = core.getBooleanInput("formatAsHTML");
     if (formatAsHTML) {
         const html = (0, html_1.htmlFormatRawLogs)(logs);
