@@ -1,6 +1,6 @@
 {
     "name": "release-build-log-action",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": " An action to append build logs to a given release",
     "repository": "https://github.com/Kas-tle/release-build-log-action.git",
     "author": "Joshua Castle <packages@kastle.dev",

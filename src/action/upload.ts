@@ -63,6 +63,7 @@ export async function uploadLogs(api: Octokit): Promise<void> {
 
         logs.push({ log, name });
     }
+    console.log(`Found ${logs.length} jobs to log`);
 
     const formatAsHTML = core.getBooleanInput("formatAsHTML");
 

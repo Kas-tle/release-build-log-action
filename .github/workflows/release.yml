@@ -31,14 +31,19 @@ jobs:
         branch: ${{ github.head_ref || github.ref_name }}
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+    - id: hash
+      run: |
+        git fetch origin 
+        echo "hash=$(git rev-parse `git branch -r --sort=committerdate | tail -1`)" >> $GITHUB_OUTPUT
     - name: Make release
       id: release
-      uses: Kas-tle/base-release-action@95bf169cd0975b3fba91535309d416801aa97a38
+      uses: Kas-tle/base-release-action@967de42efe126a33a2d3e7298242affaa0b3db61
       with:
         files: |
           dist/index.js
         appID: ${{ secrets.RELEASE_APP_ID }}
         appPrivateKey: ${{ secrets.RELEASE_APP_PK }}
+        lastCommit: ${{ steps.hash.outputs.hash }}
 
   upload-logs:
     name: Upload Logs
