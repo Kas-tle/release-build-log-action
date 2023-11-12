@@ -3,7 +3,7 @@ An action to append build logs to a given release
 
 ## Usage
 
-This action takes a release ID and uploads the build log to the release as an asset. The release ID will typically be an output from another job. For example, see [Kas-tle/release-action](https://github.com/Kas-tle/release-action).
+This action takes a release ID and uploads the build log to the release as an asset. The release ID will typically be an output from another job. For example, see [Kas-tle/base-release-action](https://github.com/Kas-tle/base-release-action).
 
 ### Minimal Configuration
 
