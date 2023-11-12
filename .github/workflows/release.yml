@@ -46,7 +46,9 @@ jobs:
     needs: release
 
     steps:
-    - uses: ./
+    - name: Upload logs
+      id: upload-logs
+      uses: ./
       with:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         releaseID: ${{ needs.release.outputs.release_id }}
