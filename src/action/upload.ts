@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import { Octokit } from "@octokit/action";
-import { htmlFormatRawLog } from '../util/html';
+import { htmlFormatRawLogs } from '../util/html';
+import { parseMultiInput } from '../util/parse';
 
 export async function uploadLogs(api: Octokit): Promise<void> {
     if(!process.env.GITHUB_REPOSITORY) {
@@ -13,7 +14,7 @@ export async function uploadLogs(api: Octokit): Promise<void> {
         throw new Error("GITHUB_RUN_NUMBER is not defined");
     }
 
-    let runID = core.getInput("runID") === "none" ? undefined : core.getInput("runID");
+    let runID = core.getInput("runID") === "auto" ? undefined : core.getInput("runID");
 
     if (!runID) {
         if (!process.env.GITHUB_RUN_ID) {
@@ -22,13 +23,13 @@ export async function uploadLogs(api: Octokit): Promise<void> {
         runID = process.env.GITHUB_RUN_ID;
     }
 
-    let attemptNumber = core.getInput("attemptNumber") === "none" ? undefined : core.getInput("attemptNumber");
+    let attemptNumber = core.getInput("attemptNumber") === "auto" ? undefined : core.getInput("attemptNumber");
 
     if (!attemptNumber) {
-        if (!process.env.GITHUB_RUN_NUMBER) {
+        if (!process.env.GITHUB_RUN_ATTEMPT) {
             attemptNumber = "1";
         } else {
-            attemptNumber = process.env.GITHUB_RUN_NUMBER;
+            attemptNumber = process.env.GITHUB_RUN_ATTEMPT;
         }
     }
 
@@ -39,10 +40,16 @@ export async function uploadLogs(api: Octokit): Promise<void> {
         attempt_number: parseInt(attemptNumber)
     });
 
-    const completedJobs = workflowRunsResponse.data.jobs.filter(job => job.status === "completed");
+    const excludedJobs = core.getInput("excludeJobs") === "" ? [] : parseMultiInput(core.getInput("excludeJobs"));
 
-    const formatAsHTML = core.getBooleanInput("formatAsHTML");
+    // Completed jobs dorted by completed_at
+    const completedJobs = workflowRunsResponse.data.jobs
+        .filter(job => job.status === "completed")
+        .filter(job => !excludedJobs.includes(job.name))
+        .sort((a, b) => { return new Date(a.completed_at!).getTime() - new Date(b.completed_at!).getTime() });
 
+
+    const logs: { log: string, name: string }[] = [];
     for (const job of completedJobs) {
         const jobLogsResponse = await api.rest.actions.downloadJobLogsForWorkflowRun({
             owner,
@@ -57,19 +64,21 @@ export async function uploadLogs(api: Octokit): Promise<void> {
             throw new Error("Location header is not defined");
         }
 
-        const jobLog = await (await fetch(location)).text();
-        const jobName = job.name.replace(/ /g, "_").toLowerCase() + '_log';
+        const log = await (await fetch(location)).text();
+        const name = job.name;
 
-        if (formatAsHTML) {
-            const html = htmlFormatRawLog(jobLog);
-            await uploadToRelease(api, `${jobName}.html`, html, owner, repo);
-            console.log(`Uploaded ${jobName}.html to release`);
-        } else {
-            await uploadToRelease(api, `${jobName}.log`, jobLog, owner, repo);
-            console.log(`Uploaded ${jobName}.log to release`);
-        }
+        logs.push({ log, name });
     }
 
+    const formatAsHTML = core.getBooleanInput("formatAsHTML");
+
+    if (formatAsHTML) {
+        const html = htmlFormatRawLogs(logs);
+        await uploadToRelease(api, 'release_log.html', html, owner, repo);
+    } else {
+        const text = logs.map(log => `## ${log.name}\n\n${log.log}`).join("\n\n");
+        await uploadToRelease(api, 'release_log.log', text, owner, repo);
+    }
 }
 
 async function uploadToRelease(api: Octokit, name: string, content: string, owner: string, repo: string): Promise<void> {

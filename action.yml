@@ -1,0 +1,33 @@
+name: release-build-log-action
+description: "An action to append build logs to a given release."
+
+inputs:
+    GITHUB_TOKEN:
+        description: 'The GitHub token to use for the release.'
+        required: true
+    releaseID:
+        description: 'The ID of the release to upload the logs.'
+        required: true
+    attemptNumber:
+        description: 'The Run attempt to get the logs from. Defaults to the current attempt.'
+        required: false
+        default: 'auto'
+    excludedJobs:
+        description: 'Comma-separated or newline-separated list of jobs from which to ignore logs.'
+        required: false
+        default: ''
+    formatAsHTML:
+        description: 'Whether or not we should make an HTML file for the logs. Defaults to true.'
+        default: 'true'
+    runID:
+        description: 'The Run ID to get the logs from. Defaults to the current run.'
+        required: false
+        default: 'auto'
+
+runs:
+    using: "node20"
+    main: "dist/index.js"
+
+branding:
+    icon: "tag"
+    color: "gray-dark"

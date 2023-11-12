@@ -30808,6 +30808,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.uploadLogs = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const html_1 = __nccwpck_require__(4818);
+const parse_1 = __nccwpck_require__(2742);
 async function uploadLogs(api) {
     if (!process.env.GITHUB_REPOSITORY) {
         throw new Error("GITHUB_REPOSITORY is not defined");
@@ -30816,20 +30817,20 @@ async function uploadLogs(api) {
     if (!process.env.GITHUB_RUN_NUMBER) {
         throw new Error("GITHUB_RUN_NUMBER is not defined");
     }
-    let runID = core.getInput("runID") === "none" ? undefined : core.getInput("runID");
+    let runID = core.getInput("runID") === "auto" ? undefined : core.getInput("runID");
     if (!runID) {
         if (!process.env.GITHUB_RUN_ID) {
             throw new Error("GITHUB_RUN_ID is not defined");
         }
         runID = process.env.GITHUB_RUN_ID;
     }
-    let attemptNumber = core.getInput("attemptNumber") === "none" ? undefined : core.getInput("attemptNumber");
+    let attemptNumber = core.getInput("attemptNumber") === "auto" ? undefined : core.getInput("attemptNumber");
     if (!attemptNumber) {
-        if (!process.env.GITHUB_RUN_NUMBER) {
+        if (!process.env.GITHUB_RUN_ATTEMPT) {
             attemptNumber = "1";
         }
         else {
-            attemptNumber = process.env.GITHUB_RUN_NUMBER;
+            attemptNumber = process.env.GITHUB_RUN_ATTEMPT;
         }
     }
     const workflowRunsResponse = await api.rest.actions.listJobsForWorkflowRunAttempt({
@@ -30838,8 +30839,13 @@ async function uploadLogs(api) {
         run_id: parseInt(runID),
         attempt_number: parseInt(attemptNumber)
     });
-    const completedJobs = workflowRunsResponse.data.jobs.filter(job => job.status === "completed");
-    const formatAsHTML = core.getBooleanInput("formatAsHTML");
+    const excludedJobs = core.getInput("excludeJobs") === "" ? [] : (0, parse_1.parseMultiInput)(core.getInput("excludeJobs"));
+    // Completed jobs dorted by completed_at
+    const completedJobs = workflowRunsResponse.data.jobs
+        .filter(job => job.status === "completed")
+        .filter(job => !excludedJobs.includes(job.name))
+        .sort((a, b) => { return new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime(); });
+    const logs = [];
     for (const job of completedJobs) {
         const jobLogsResponse = await api.rest.actions.downloadJobLogsForWorkflowRun({
             owner,
@@ -30851,17 +30857,18 @@ async function uploadLogs(api) {
         if (!location) {
             throw new Error("Location header is not defined");
         }
-        const jobLog = await (await fetch(location)).text();
-        const jobName = job.name.replace(/ /g, "_").toLowerCase() + '_log';
-        if (formatAsHTML) {
-            const html = (0, html_1.htmlFormatRawLog)(jobLog);
-            await uploadToRelease(api, `${jobName}.html`, html, owner, repo);
-            console.log(`Uploaded ${jobName}.html to release`);
-        }
-        else {
-            await uploadToRelease(api, `${jobName}.log`, jobLog, owner, repo);
-            console.log(`Uploaded ${jobName}.log to release`);
-        }
+        const log = await (await fetch(location)).text();
+        const name = job.name;
+        logs.push({ log, name });
+    }
+    const formatAsHTML = core.getBooleanInput("formatAsHTML");
+    if (formatAsHTML) {
+        const html = (0, html_1.htmlFormatRawLogs)(logs);
+        await uploadToRelease(api, 'release_log.html', html, owner, repo);
+    }
+    else {
+        const text = logs.map(log => `## ${log.name}\n\n${log.log}`).join("\n\n");
+        await uploadToRelease(api, 'release_log.log', text, owner, repo);
     }
 }
 exports.uploadLogs = uploadLogs;
@@ -30895,67 +30902,82 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.htmlFormatRawLog = void 0;
+exports.htmlFormatRawLogs = void 0;
 const ansi_to_html_1 = __importDefault(__nccwpck_require__(9451));
 const convert = new ansi_to_html_1.default();
-function htmlFormatRawLog(log) {
-    const lines = log.split('\n');
-    let inGroup = false;
+function htmlFormatRawLogs(logs) {
     let htmlContent = '';
     const color = '#d1d7dd';
     const bgColor = '#151516';
     const commandColor = '#0008ff';
-    lines.forEach(line => {
-        // Regular expressions for stricter parsing
-        const groupStartRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) ##\[group\](.*)/;
-        const groupEndRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z ##\[endgroup\]/;
-        const commandRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) \[command\](.*)/;
-        if (groupStartRegex.test(line)) {
-            if (inGroup) {
-                // Close previous group if it wasn't closed
-                htmlContent += '</div></div>';
+    logs.forEach(({ log, name }) => {
+        let logHtmlContent = '';
+        const lines = log.split('\n');
+        let inGroup = false;
+        lines.forEach(line => {
+            // Regular expressions for stricter parsing
+            const groupStartRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) ##\[group\](.*)/;
+            const groupEndRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z ##\[endgroup\]/;
+            const commandRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) \[command\](.*)/;
+            if (groupStartRegex.test(line)) {
+                if (inGroup) {
+                    logHtmlContent += '</div></div>';
+                }
+                const matches = line.match(groupStartRegex);
+                const timestamp = matches[1];
+                const title = matches[2];
+                inGroup = true;
+                logHtmlContent += `<div class="log-group"><div class="collapsible">${timestamp} ${title} <span class="indicator">&lt;...&gt;</span></div><div class="content">`;
             }
-            const matches = line.match(groupStartRegex);
-            const timestamp = matches[1];
-            const title = matches[2];
-            inGroup = true;
-            htmlContent += `<div class="log-group"><div class="collapsible">${timestamp} ${title} <span class="indicator">&lt;...&gt;</span></div><div class="content">`;
+            else if (groupEndRegex.test(line)) {
+                inGroup = false;
+                logHtmlContent += '</div></div>';
+            }
+            else if (commandRegex.test(line)) {
+                const matches = line.match(commandRegex);
+                const timestamp = matches[1];
+                const command = matches[2];
+                const formattedLine = `${timestamp} <span style="color: ${commandColor};">${toHTML(command)}</span><br>`;
+                logHtmlContent += formattedLine;
+            }
+            else {
+                const formattedLine = toHTML(line);
+                logHtmlContent += inGroup ? formattedLine + '<br>' : `<div>${formattedLine}</div>`;
+            }
+        });
+        if (inGroup) {
+            logHtmlContent += '</div></div>';
         }
-        else if (groupEndRegex.test(line)) {
-            inGroup = false;
-            htmlContent += '</div></div>';
-        }
-        else if (commandRegex.test(line)) {
-            const matches = line.match(commandRegex);
-            const timestamp = matches[1];
-            const command = matches[2];
-            const formattedLine = `${timestamp} <span style="color: ${commandColor};">${toHTML(command)}</span><br>`;
-            htmlContent += formattedLine;
-        }
-        else {
-            const formattedLine = toHTML(line);
-            htmlContent += inGroup ? formattedLine + '<br>' : `<div>${formattedLine}</div>`;
-        }
+        htmlContent += `
+            <div class="log-section">
+                <div class="log-header collapsible">${name} <span class="indicator">&lt;...&gt;</span></div>
+                <div class="log-body" style="display: block;">${logHtmlContent}</div>
+            </div>
+        `;
     });
-    if (inGroup) {
-        htmlContent += '</div></div>';
-    }
     return `
     <div style="background-color: ${bgColor}; color: ${color}; font-family: monospace; overflow-wrap: break-word;">
         <button id="toggle-all">&lt;...&gt;</button>
         ${htmlContent}
     </div>
     <script>
-        const collapsibles = document.querySelectorAll('.collapsible');
-        document.getElementById('toggle-all').addEventListener('click', function() {
-            let anyClosed = Array.from(collapsibles).some(collapsible => !collapsible.classList.contains('active'));
-            collapsibles.forEach(collapsible => {
-                collapsible.classList[anyClosed ? 'add' : 'remove']('active');
-                collapsible.nextElementSibling.style.display = anyClosed ? 'block' : 'none';
+        document.querySelectorAll('.log-header').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('active');
+                var body = this.nextElementSibling;
+                body.style.display = body.style.display === 'block' ? 'none' : 'block';
             });
         });
 
-        collapsibles.forEach(div => {
+        document.getElementById('toggle-all').addEventListener('click', function() {
+            let anyGroupClosed = Array.from(document.querySelectorAll('.content')).some(content => content.style.display === 'none');
+            document.querySelectorAll('.content').forEach(content => {
+                content.style.display = anyGroupClosed ? 'block' : 'none';
+                content.previousElementSibling.classList[anyGroupClosed ? 'add' : 'remove']('active');
+            });
+        });
+
+        document.querySelectorAll('.collapsible:not(.log-header)').forEach(div => {
             div.addEventListener('click', function() {
                 this.classList.toggle('active');
                 var content = this.nextElementSibling;
@@ -30990,7 +31012,7 @@ function htmlFormatRawLog(log) {
             font-size: smaller;
         }
 
-        .content {
+        .content, .log-body {
             padding: 0 18px;
             display: none;
             overflow: hidden;
@@ -31001,10 +31023,32 @@ function htmlFormatRawLog(log) {
         }
     </style>`;
 }
-exports.htmlFormatRawLog = htmlFormatRawLog;
+exports.htmlFormatRawLogs = htmlFormatRawLogs;
 function toHTML(str) {
     return convert.toHtml(str).replace(/ {2,}/g, match => '&nbsp;'.repeat(match.length));
 }
+
+
+/***/ }),
+
+/***/ 2742:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.parseMultiInput = void 0;
+function parseMultiInput(input) {
+    let result;
+    if (input.includes('\n')) {
+        result = input.split('\n');
+    }
+    else {
+        result = input.split(',');
+    }
+    return result.map(s => s.trim()).filter(s => s !== '');
+}
+exports.parseMultiInput = parseMultiInput;
 
 
 /***/ }),
