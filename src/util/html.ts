@@ -6,7 +6,7 @@ export function htmlFormatRawLogs(logs: { log: string, name: string }[]): string
     let htmlContent = '';
 
     const color = '#d1d7dd';
-    const bgColor = '#151516';
+    const bgColor = '#0e0e0e';
     const commandColor = '#0008ff';
 
     logs.forEach(({ log, name }) => {
@@ -57,72 +57,81 @@ export function htmlFormatRawLogs(logs: { log: string, name: string }[]): string
     });
 
     return `
-    <div style="background-color: ${bgColor}; color: ${color}; font-family: monospace; overflow-wrap: break-word;">
-        <button id="toggle-all">&lt;...&gt;</button>
-        ${htmlContent}
-    </div>
-    <script>
-        document.querySelectorAll('.log-header').forEach(header => {
-            header.addEventListener('click', function() {
-                this.classList.toggle('active');
-                var body = this.nextElementSibling;
-                body.style.display = body.style.display === 'block' ? 'none' : 'block';
-            });
-        });
+    <html style="background-color: ${bgColor};">
+        <body>
+            <div style="color: ${color}; font-family: monospace; overflow-wrap: break-word;">
+                <button id="toggle-all">&lt;...&gt;</button>
+                ${htmlContent}
+            </div>
+            <script>
+                document.querySelectorAll('.content').forEach(content => {
+                    content.style.display = 'none';
+                    content.previousElementSibling.classList.remove('active');
+                });
 
-        document.getElementById('toggle-all').addEventListener('click', function() {
-            let anyGroupClosed = Array.from(document.querySelectorAll('.content')).some(content => content.style.display === 'none');
-            document.querySelectorAll('.content').forEach(content => {
-                content.style.display = anyGroupClosed ? 'block' : 'none';
-                content.previousElementSibling.classList[anyGroupClosed ? 'add' : 'remove']('active');
-            });
-        });
+                document.querySelectorAll('.log-header').forEach(header => {
+                    header.addEventListener('click', function() {
+                        this.classList.toggle('active');
+                        var body = this.nextElementSibling;
+                        body.style.display = body.style.display === 'block' ? 'none' : 'block';
+                    });
+                });
 
-        document.querySelectorAll('.collapsible:not(.log-header)').forEach(div => {
-            div.addEventListener('click', function() {
-                this.classList.toggle('active');
-                var content = this.nextElementSibling;
-                content.style.display = content.style.display === 'block' ? 'none' : 'block';
-            });
-        });
-    </script>
-    <style>
-        #toggle-all {
-            font-family: monospace;
-            margin-bottom: 10px;
-        }
+                document.getElementById('toggle-all').addEventListener('click', function() {
+                    let anyGroupClosed = Array.from(document.querySelectorAll('.content')).some(content => content.style.display === 'none' || content.style.display === '');
+                    document.querySelectorAll('.content').forEach(content => {
+                        content.style.display = anyGroupClosed ? 'block' : 'none';
+                        content.previousElementSibling.classList[anyGroupClosed ? 'add' : 'remove']('active');
+                    });
+                });
 
-        .collapsible {
-            font-family: inherit;
-            font-weight: bold;
-            background-color: transparent;
-            color: inherit;
-            cursor: pointer;
-            padding: 0px;
-            border: none;
-            text-align: left;
-            outline: none;
-            display: block; /* Ensures the div behaves like a block element */
-        }
+                document.querySelectorAll('.collapsible:not(.log-header)').forEach(div => {
+                    div.addEventListener('click', function() {
+                        this.classList.toggle('active');
+                        var content = this.nextElementSibling;
+                        content.style.display = content.style.display === 'block' ? 'none' : 'block';
+                    });
+                });
+            </script>
+            <style>
+                #toggle-all {
+                    font-family: monospace;
+                    margin-bottom: 10px;
+                }
 
-        .collapsible:hover .indicator {
-            text-decoration: underline;
-        }
+                .collapsible {
+                    font-family: inherit;
+                    font-weight: bold;
+                    background-color: transparent;
+                    color: inherit;
+                    cursor: pointer;
+                    padding: 0px;
+                    border: none;
+                    text-align: left;
+                    outline: none;
+                    display: block; /* Ensures the div behaves like a block element */
+                }
 
-        .indicator {
-            font-size: smaller;
-        }
+                .collapsible:hover .indicator {
+                    text-decoration: underline;
+                }
 
-        .content, .log-body {
-            padding: 0 18px;
-            display: none;
-            overflow: hidden;
-        }
+                .indicator {
+                    font-size: smaller;
+                }
 
-        div {
-            overflow-wrap: break-word;
-        }
-    </style>`;
+                .content, .log-body {
+                    padding: 0 18px;
+                    display: none;
+                    overflow: hidden;
+                }
+
+                div {
+                    overflow-wrap: break-word;
+                }
+            </style>
+        </body>
+    </html>`;
 }
 
 function toHTML(str: string): string {
