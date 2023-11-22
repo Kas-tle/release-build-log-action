@@ -37,7 +37,7 @@ jobs:
         echo "hash=$(git rev-parse `git branch -r --sort=committerdate | tail -1`)" >> $GITHUB_OUTPUT
     - name: Make release
       id: release
-      uses: Kas-tle/base-release-action@967de42efe126a33a2d3e7298242affaa0b3db61
+      uses: Kas-tle/base-release-action@61eabbe2b0fe67c9909c4c810d2ddb597465dfb4
       with:
         files: |
           dist/index.js
