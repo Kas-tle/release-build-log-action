@@ -37,13 +37,14 @@ jobs:
         echo "hash=$(git rev-parse `git branch -r --sort=committerdate | tail -1`)" >> $GITHUB_OUTPUT
     - name: Make release
       id: release
-      uses: Kas-tle/base-release-action@61eabbe2b0fe67c9909c4c810d2ddb597465dfb4
+      uses: Kas-tle/base-release-action@b863fa0f89bd15267a96a72efb84aec25f168d4c
       with:
         files: |
           dist/index.js
         appID: ${{ secrets.RELEASE_APP_ID }}
         appPrivateKey: ${{ secrets.RELEASE_APP_PK }}
         lastCommit: ${{ steps.hash.outputs.hash }}
+        discordWebhook: ${{ secrets.DISCORD_WEBHOOK }}
 
   upload-logs:
     name: Upload Logs

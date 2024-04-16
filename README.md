@@ -1,5 +1,6 @@
 # release-build-log-action
-An action to append build logs to a given release
+
+You can join the [Discord](https://discord.gg/5z4GuSnqmQ) for help with this project. An action to append build logs to a given release
 
 ## Usage
 
